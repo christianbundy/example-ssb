@@ -18,7 +18,7 @@ const unsignedMessageObject = {
   previous: null,
   sequence: 1,
   author,
-  timestamp: 1234567890987,
+  timestamp: Date.now(),
   hash: "sha256",
   content: {
     type: "post",
