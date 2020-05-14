@@ -1,36 +1,41 @@
-const crypto = require("crypto");
+import * as ed from "https://raw.githubusercontent.com/christianbundy/noble-ed25519/deno/index.ts";
+import { Sha256 } from "https://deno.land/std/hash/sha256.ts";
+import * as base64 from "https://denopkg.com/chiefbiiko/base64/mod.ts";
+import { decodeString } from "https://deno.land/std/encoding/hex.ts";
+
+const sha256 = (input) => new Sha256().update(input).digest();
+
+const createKeys = () => {
+  const PRIVATE_KEY = ed.utils.randomPrivateKey(); // 32-byte Uint8Array or string.
+
+  return {
+    getPublicKey: async () => await ed.getPublicKey(PRIVATE_KEY),
+    sign: async (input) => decodeString(await ed.sign(input, PRIVATE_KEY)),
+  };
+};
 
 let sequence = 1;
 let previous = null;
 
-const createAuthor = () => {
+const createAuthor = async () => {
   // Create a pair of public and private keys, which will be used for:
   //
   // - Signing public messages.
   // - Decrypting private messages.
   //
   // The public key is meant to be shared, the private key MUST NEVER BE SHARED.
-  const keyPair = crypto.generateKeyPairSync("ed25519", {
-    publicKeyEncoding: {
-      type: "spki",
-      format: "der",
-    },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "der",
-    },
-  });
+  const keys = createKeys();
 
   // I don't remember why we only want the last 32 characters, but we
   // need to convert it to base64 and then decorate it with the `@` prefix
   // and the `.ed25519` suffix.
-  const publicKeyBase64 = keyPair.publicKey.slice(-32).toString("base64");
-  const author = `@${publicKeyBase64}.ed25519`;
+  const publicKeyBase64 = await keys.getPublicKey();
+  const author = `@${base64.fromUint8Array(publicKeyBase64)}.ed25519`;
 
   const messages = [];
 
   return {
-    createMessage: (content) => {
+    createMessage: async (content) => {
       const value = {
         previous,
         sequence,
@@ -43,24 +48,17 @@ const createAuthor = () => {
       // TODO: Can we avoid passing through to `crypto.createPrivateKey()` here?
       const payload = JSON.stringify(value, null, 2);
 
-      const signature = crypto
-        .sign(null, Buffer.from(payload), {
-          key: keyPair.privateKey,
-          format: "der",
-          type: "pkcs8",
-        })
-        .toString("base64");
+      const sign = await keys.sign(payload);
+      const signature = base64.fromUint8Array(sign);
 
       // The .ed25519 suffix is customary.
       value.signature = `${signature}.ed25519`;
 
       // We get the key *after* the signature. This has made a lot of people
       // very angry and been widely regarded as a bad move.
-      const hash = crypto
-        .createHash("sha256")
-        .update(JSON.stringify(value, null, 2))
-        .digest()
-        .toString("base64");
+      const hash = base64.fromUint8Array(
+        sha256(JSON.stringify(value, null, 2))
+      );
 
       // The `%` prefix and `.sha256` suffix are customary.
       const key = `%${hash}.sha256`;
@@ -76,17 +74,21 @@ const createAuthor = () => {
   };
 };
 
-const alice = createAuthor();
+const main = async () => {
+  const alice = await createAuthor();
 
-const hello = alice.createMessage({
-  type: "post",
-  text: "hello",
-  source: "https://github.com/christianbundy/example-ssb",
-});
-const world = alice.createMessage({
-  type: "post",
-  text: "world",
-  source: "https://github.com/christianbundy/example-ssb",
-});
+  const hello = await alice.createMessage({
+    type: "post",
+    text: "hello",
+    source: "https://github.com/christianbundy/example-ssb",
+  });
+  const world = await alice.createMessage({
+    type: "post",
+    text: "deno",
+    source: "https://github.com/christianbundy/example-ssb",
+  });
 
-console.log(JSON.stringify([hello, world], null, 2));
+  console.log(JSON.stringify([hello, world], null, 2));
+};
+
+main();
