@@ -1,39 +1,37 @@
 import * as ed from "https://raw.githubusercontent.com/christianbundy/noble-ed25519/deno/index.ts";
 import { Sha256 } from "https://deno.land/std/hash/sha256.ts";
 import * as base64 from "https://denopkg.com/chiefbiiko/base64/mod.ts";
-import { decodeString } from "https://deno.land/std/encoding/hex.ts";
 
 const sha256 = (input) => new Sha256().update(input).digest();
 
 const createKeys = () => {
-  const PRIVATE_KEY = ed.utils.randomPrivateKey(); // 32-byte Uint8Array or string.
+  const PRIVATE_KEY = ed.utils.randomPrivateKey();
 
+  // This is all kind of a mess. Do we always have to `Uint8Array.from()`?
   return {
     getPublicKey: async () => await ed.getPublicKey(PRIVATE_KEY),
-    sign: async (input) => decodeString(await ed.sign(input, PRIVATE_KEY)),
+    sign: async (message) =>
+      await ed.sign(Uint8Array.from(message), PRIVATE_KEY),
+    verify: async (signature, message) =>
+      await ed.verify(
+        signature,
+        Uint8Array.from(message),
+        await ed.getPublicKey(PRIVATE_KEY)
+      ),
   };
 };
 
-let sequence = 1;
-let previous = null;
-
-const createAuthor = async () => {
-  // Create a pair of public and private keys, which will be used for:
-  //
-  // - Signing public messages.
-  // - Decrypting private messages.
-  //
-  // The public key is meant to be shared, the private key MUST NEVER BE SHARED.
+export const createAuthor = async () => {
+  // Metadata
   const keys = createKeys();
+  const author = `@${base64.fromUint8Array(await keys.getPublicKey())}.ed25519`;
 
-  // I don't remember why we only want the last 32 characters, but we
-  // need to convert it to base64 and then decorate it with the `@` prefix
-  // and the `.ed25519` suffix.
-  const publicKeyBase64 = await keys.getPublicKey();
-  const author = `@${base64.fromUint8Array(publicKeyBase64)}.ed25519`;
-
+  // State
   const messages = [];
+  let sequence = 1;
+  let previous = null;
 
+  // Method (`createMessage`)
   return {
     createMessage: async (content) => {
       const value = {
@@ -45,10 +43,17 @@ const createAuthor = async () => {
         content,
       };
 
-      // TODO: Can we avoid passing through to `crypto.createPrivateKey()` here?
       const payload = JSON.stringify(value, null, 2);
-
       const sign = await keys.sign(payload);
+
+      const isValid = await keys.verify(sign, payload);
+
+      if (isValid === false) {
+        throw new Error("Signature must be valid");
+      }
+
+      // console.log({sign})
+
       const signature = base64.fromUint8Array(sign);
 
       // The .ed25519 suffix is customary.
@@ -73,22 +78,3 @@ const createAuthor = async () => {
     },
   };
 };
-
-const main = async () => {
-  const alice = await createAuthor();
-
-  const hello = await alice.createMessage({
-    type: "post",
-    text: "hello",
-    source: "https://github.com/christianbundy/example-ssb",
-  });
-  const world = await alice.createMessage({
-    type: "post",
-    text: "deno",
-    source: "https://github.com/christianbundy/example-ssb",
-  });
-
-  console.log(JSON.stringify([hello, world], null, 2));
-};
-
-main();
