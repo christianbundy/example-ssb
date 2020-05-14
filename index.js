@@ -2,6 +2,10 @@ const crypto = require("crypto");
 
 const sha256 = (input) => crypto.createHash("sha256").update(input).digest();
 
+// Create a keypair and expose two methods:
+//
+// - getPublicKey() -> Buffer
+// - sign(input: Buffer) -> Buffer
 const createKeys = () => {
   const keyPair = crypto.generateKeyPairSync("ed25519", {
     publicKeyEncoding: {
@@ -25,21 +29,14 @@ const createKeys = () => {
   };
 };
 
-let sequence = 1;
-let previous = null;
-
-const createAuthor = () => {
-  // Create a pair of public and private keys, which will be used for:
-  //
-  // - Signing public messages.
-  // - Decrypting private messages.
-  //
-  // The public key is meant to be shared, the private key MUST NEVER BE SHARED.
+// Create an author (with state) and expose one method:
+//
+// - createMessage(content: Object) -> Object
+exports.createAuthor = () => {
   const keys = createKeys();
+  let sequence = 1;
+  let previous = null;
 
-  // I don't remember why we only want the last 32 characters, but we
-  // need to convert it to base64 and then decorate it with the `@` prefix
-  // and the `.ed25519` suffix.
   const publicKeyBase64 = keys.getPublicKey().toString("base64");
   const author = `@${publicKeyBase64}.ed25519`;
 
@@ -82,17 +79,3 @@ const createAuthor = () => {
   };
 };
 
-const alice = createAuthor();
-
-const hello = alice.createMessage({
-  type: "post",
-  text: "hello",
-  source: "https://github.com/christianbundy/example-ssb",
-});
-const world = alice.createMessage({
-  type: "post",
-  text: "world",
-  source: "https://github.com/christianbundy/example-ssb",
-});
-
-console.log(JSON.stringify([hello, world], null, 2));
