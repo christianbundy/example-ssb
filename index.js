@@ -61,8 +61,8 @@ const createAuthor = () => {
 
       const signature = keys.sign(payload).toString("base64");
 
-      // The .ed25519 suffix is customary.
-      value.signature = `${signature}.ed25519`;
+      // The `.sig.ed25519` suffix is customary.
+      value.signature = `${signature}.sig.ed25519`;
 
       // We get the key *after* the signature. This has made a lot of people
       // very angry and been widely regarded as a bad move.
