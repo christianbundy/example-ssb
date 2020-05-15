@@ -35,8 +35,9 @@ exports.createAuthor = () => {
       };
 
       // Insert the message into the database.
-      return messages.push(message);
+      messages.push(message);
+
+      return message;
     },
-    getMessages: () => messages,
   };
 };
