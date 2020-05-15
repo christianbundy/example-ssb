@@ -2,6 +2,9 @@ import * as ed from "https://deno.land/x/ed25519/mod.ts";
 import { Sha256 } from "https://deno.land/std/hash/sha256.ts";
 import * as base64 from "https://denopkg.com/chiefbiiko/base64/mod.ts";
 
+// Always verify signatures.
+const paranoid = false;
+
 const sha256 = (input) => new Sha256().update(input).digest();
 
 const createKeys = () => {
@@ -11,11 +14,11 @@ const createKeys = () => {
   return {
     getPublicKey: async () => await ed.getPublicKey(PRIVATE_KEY),
     sign: async (message) =>
-      await ed.sign(Uint8Array.from(message), PRIVATE_KEY),
+      await ed.sign(new TextEncoder().encode(message), PRIVATE_KEY),
     verify: async (signature, message) =>
       await ed.verify(
         signature,
-        Uint8Array.from(message),
+        new TextEncoder().encode(message),
         await ed.getPublicKey(PRIVATE_KEY)
       ),
   };
@@ -44,20 +47,19 @@ export const createAuthor = async () => {
       };
 
       const payload = JSON.stringify(value, null, 2);
-      const sign = await keys.sign(payload);
 
-      const isValid = await keys.verify(sign, payload);
+      const signature = await keys.sign(payload);
 
-      if (isValid === false) {
-        throw new Error("Signature must be valid");
+      if (paranoid === true) {
+        const isValid = await keys.verify(signature, payload);
+
+        if (isValid === false) {
+          throw new Error("Signature must be valid");
+        }
       }
 
-      // console.log({sign})
-
-      const signature = base64.fromUint8Array(sign);
-
       // The .ed25519 suffix is customary.
-      value.signature = `${signature}.sig.ed25519`;
+      value.signature = `${base64.fromUint8Array(signature)}.sig.ed25519`;
 
       // We get the key *after* the signature. This has made a lot of people
       // very angry and been widely regarded as a bad move.
