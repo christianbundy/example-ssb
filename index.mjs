@@ -1,4 +1,4 @@
-import * as ed from "https://raw.githubusercontent.com/christianbundy/noble-ed25519/deno/index.ts";
+import * as ed from "https://deno.land/x/ed25519/mod.ts";
 import { Sha256 } from "https://deno.land/std/hash/sha256.ts";
 import * as base64 from "https://denopkg.com/chiefbiiko/base64/mod.ts";
 
