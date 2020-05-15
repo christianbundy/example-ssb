@@ -7,6 +7,6 @@ Pairs well with [HTTP-SSB](https://github.com/christianbundy/http-ssb).
 If you want to try creating two messages and uploading them to a Glitch site:
 
 ```sh
-test index.js | \
+node test.js | \
 curl --header 'Content-Type: application/json' --data '@-' https://daily-alluring-robe.glitch.me
 ```
