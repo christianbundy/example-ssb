@@ -1,80 +1,42 @@
-const crypto = require("crypto");
+const { sha256, ed25519 } = require("./crypto");
 
-const sha256 = (input) => crypto.createHash("sha256").update(input).digest();
-
-// Create a keypair and expose two methods:
-//
-// - getPublicKey() -> Buffer
-// - sign(input: Buffer) -> Buffer
-const createKeys = () => {
-  const keyPair = crypto.generateKeyPairSync("ed25519", {
-    publicKeyEncoding: {
-      type: "spki",
-      format: "der",
-    },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "der",
-    },
-  });
-
-  return {
-    getPublicKey: () => keyPair.publicKey.slice(-32),
-    sign: (input) =>
-      crypto.sign(null, Buffer.from(input), {
-        key: keyPair.privateKey,
-        format: "der",
-        type: "pkcs8",
-      }),
-  };
-};
-
-// Create an author (with state) and expose one method:
-//
-// - createMessage(content: Object) -> Object
+// Create author, identified by ed25519 keypair and a list of messages.
 exports.createAuthor = () => {
-  const keys = createKeys();
-  let sequence = 1;
-  let previous = null;
-
-  const publicKeyBase64 = keys.getPublicKey().toString("base64");
-  const author = `@${publicKeyBase64}.ed25519`;
-
+  const keys = ed25519();
   const messages = [];
+
+  const getPreviousMessageKey = () => {
+    if (messages.length === 0) {
+      return null;
+    } else {
+      const previousMessage = messages[messages.length - 1];
+      return previousMessage.key;
+    }
+  };
 
   return {
     createMessage: (content) => {
       const value = {
-        previous,
-        sequence,
-        author,
+        previous: getPreviousMessageKey(),
+        sequence: messages.length + 1,
+        author: `@${keys.publicKey}.ed25519`,
         timestamp: Date.now(),
         hash: "sha256",
         content,
       };
 
-      // TODO: Can we avoid passing through to `crypto.createPrivateKey()` here?
-      const payload = JSON.stringify(value, null, 2);
+      // Calculate a signature and insert it into the message.
+      value.signature = `${keys.sign(value)}.sig.ed25519`;
 
-      const signature = keys.sign(payload).toString("base64");
+      // Calculate a key, which is used as an identifier for `value`.
+      const message = {
+        key: `%${sha256(value)}.sha256`,
+        value,
+      };
 
-      // The `.sig.ed25519` suffix is customary.
-      value.signature = `${signature}.sig.ed25519`;
-
-      // We get the key *after* the signature. This has made a lot of people
-      // very angry and been widely regarded as a bad move.
-      const hash = sha256(JSON.stringify(value, null, 2)).toString("base64");
-
-      // The `%` prefix and `.sha256` suffix are customary.
-      const key = `%${hash}.sha256`;
-
-      previous = key;
-      sequence += 1;
-
-      const message = { key, value };
-      messages.push(message);
-
-      return message;
+      // Insert the message into the database.
+      return messages.push(message);
     },
+    getMessages: () => messages,
   };
 };
