@@ -19,8 +19,16 @@ exports.createAuthor = () => {
         content,
       };
 
-      // Add signature.
-      value.signature = `${keys.sign(value)}.sig.ed25519`;
+      // Create signature.
+      const signature = keys.sign(value);
+
+      // Verify signature.
+      if (keys.verify(value, keys.publicKey, signature) === false) {
+        throw new Error("Invalid signature!");
+      }
+
+      // Insert signature.
+      value.signature = `${signature}.sig.ed25519`;
 
       // Create identifier.
       const key = `%${sha256(value)}.sha256`;
@@ -29,6 +37,7 @@ exports.createAuthor = () => {
       previous = key;
       sequence += 1;
 
+      // Full 'entry' returned for convenience.
       return {
         key,
         value,

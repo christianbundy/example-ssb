@@ -1,5 +1,7 @@
 const crypto = require("crypto");
 
+const derEncode = (base64PublicKey) => `MCowBQYDK2VwAyEA${base64PublicKey}`;
+
 // - Serialize JSON to a string.
 // - Pretty print
 //   - No limit to object depth.
@@ -48,5 +50,16 @@ exports.ed25519 = () => {
           type: "pkcs8",
         })
         .toString("base64"),
+    verify: (data, key, signature) =>
+      crypto.verify(
+        null, // Auto-detect Ed25519 key type.
+        Buffer.from(serialize(data)),
+        {
+          key: Buffer.from(derEncode(key), "base64"),
+          format: "der",
+          type: "spki",
+        },
+        Buffer.from(signature, "base64")
+      ),
   };
 };
