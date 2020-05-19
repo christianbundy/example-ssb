@@ -1,43 +1,38 @@
 const { sha256, ed25519 } = require("./crypto");
 
-// Create author, identified by ed25519 keypair and a list of messages.
 exports.createAuthor = () => {
   const keys = ed25519();
-  const messages = [];
 
-  const getPreviousMessageKey = () => {
-    if (messages.length === 0) {
-      return null;
-    } else {
-      const previousMessage = messages[messages.length - 1];
-      return previousMessage.key;
-    }
-  };
+  // Current state.
+  let previous = null;
+  let sequence = 1;
 
   return {
     createMessage: (content) => {
+      // Create unsigned message.
       const value = {
-        previous: getPreviousMessageKey(),
-        sequence: messages.length + 1,
+        previous,
+        sequence,
         author: `@${keys.publicKey}.ed25519`,
         timestamp: Date.now(),
         hash: "sha256",
         content,
       };
 
-      // Calculate a signature and insert it into the message.
+      // Add signature.
       value.signature = `${keys.sign(value)}.sig.ed25519`;
 
-      // Calculate a key, which is used as an identifier for `value`.
-      const message = {
-        key: `%${sha256(value)}.sha256`,
+      // Create identifier.
+      const key = `%${sha256(value)}.sha256`;
+
+      // Update state.
+      previous = key;
+      sequence += 1;
+
+      return {
+        key,
         value,
       };
-
-      // Insert the message into the database.
-      messages.push(message);
-
-      return message;
     },
   };
 };
