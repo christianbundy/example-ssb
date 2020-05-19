@@ -1,5 +1,10 @@
+// Node.js uses OpenSSL under the hood, which means that we have to jump through
+// some hoops to satisfy ASN.1 encoding. Alternatives like libsodium don't have
+// this problem, but I wanted to try to use only the standard library to avoid
+// all of the problems you get with native modules via npm.
 const crypto = require("crypto");
 
+// These magic bytes help us encode our public key integer as ASN.1 DER. 🤷
 const derEncode = (base64PublicKey) => `MCowBQYDK2VwAyEA${base64PublicKey}`;
 
 // - Serialize JSON to a string.
