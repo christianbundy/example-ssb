@@ -24,12 +24,12 @@ exports.sha256 = (input) =>
 exports.ed25519 = () => {
   const keyPair = crypto.generateKeyPairSync("ed25519", {
     publicKeyEncoding: {
-      type: "spki",
       format: "der",
+      type: "spki",
     },
     privateKeyEncoding: {
-      type: "pkcs8",
       format: "der",
+      type: "pkcs8",
     },
   });
 
